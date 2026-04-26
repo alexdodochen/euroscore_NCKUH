@@ -81,9 +81,35 @@ def update_main(ws, chart, score):
     return None
 
 
+FIELD_KEY_MAP = {
+    "年齡 (歲)": "age",
+    "性別": "female",
+    "體重 (kg)": "weight_kg",
+    "血清 Cr (mg/dL)": "cr_mg_dl",
+    "Creatinine clearance (ml/min)": None,  # auto-computed, no rationale
+    "腎功能分級": "renal",
+    "NYHA class": "nyha",
+    "CCS angina class 4": "ccs4",
+    "胰島素糖尿病 IDDM": "iddm",
+    "心外動脈病變 ECA": "extracardiac_arteriopathy",
+    "慢性肺病 CPD": "chronic_pulmonary_disease",
+    "行動不便": "poor_mobility",
+    "曾接受心臟手術 Redo": "previous_cardiac_surgery",
+    "Active endocarditis": "active_endocarditis",
+    "Critical preop state": "critical_preop",
+    "LV function": "lv_function",
+    "Recent MI (90 天內)": "recent_mi",
+    "PA systolic 肺動脈收縮壓": "pa_systolic",
+    "Urgency": "urgency",
+    "Weight of procedure": "weight_of_procedure",
+    "Thoracic aorta surgery": "thoracic_aorta",
+}
+
+
 def update_assessment_block(ws, chart, score, p):
-    """Find the patient block (header contains chart number) and fill values."""
+    """Find the patient block (header contains chart number) and fill values + rationale (col D)."""
     fields = display(p)
+    rationale = p.get("rationale", {}) or {}
     # Find header row
     header_row = None
     for r in range(1, ws.max_row + 1):
@@ -108,6 +134,9 @@ def update_assessment_block(ws, chart, score, p):
             break
         if label_str in fields:
             ws.cell(row=r, column=2, value=fields[label_str])
+            field_key = FIELD_KEY_MAP.get(label_str)
+            if field_key and field_key in rationale:
+                ws.cell(row=r, column=4, value=rationale[field_key])
             filled += 1
     return filled
 

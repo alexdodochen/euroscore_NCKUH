@@ -32,7 +32,14 @@ thoracic_aorta: false
 manual_score: <unchanged from template>
 ```
 
-After the YAML, write a brief 5-line "判讀依據" block citing the exact phrase from EMR that supports each non-default field.
+In addition to the YAML above, output a `rationale:` dict at the END of the YAML, with one entry per non-default field. Format:
+
+```yaml
+rationale:
+  field_key: "短句說明依據（例：AD: 'lives at home with independent daily activity' / DC hospital course / Order list / Echo 2026-02-11 LVEF 53%）"
+```
+
+Only include rationale for fields that are non-default (e.g. iddm: true, previous_cardiac_surgery: true, recent_mi: true, ECA: true, critical_preop: true, NYHA != I, ccs4: true, renal != normal, lv_function != good, pa_systolic != none). Skip default-value fields.
 
 EMR text follows after this line:
 ---
