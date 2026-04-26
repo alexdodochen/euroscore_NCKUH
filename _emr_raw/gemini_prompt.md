@@ -54,7 +54,9 @@ rationale:
 - pa_systolic
 - renal
 
-For each, cite WHERE in the EMR you found evidence (AD past hx / DC hospital course / Order list / Echo report / problem list / specific quote). For N values, briefly note what was checked and not found.
+For each, cite WHERE in the EMR you found evidence (AD past hx / DC hospital course / Order list / Echo report / problem list / **OPD diagnosis ±3mo** / specific quote). For N values, briefly note what was checked and not found.
+
+**重要**：input 可能包含住院前後的門診 (OPD) 紀錄（標記 `[門診]`）。對 ECA / chronic_pulmonary_disease / IDDM / previous_cardiac_surgery 等容易在住院 PMH 漏寫的診斷，**必須掃描所有 OPD diagnosis** 看有沒有遺漏。例如住院 AD 沒提 PAOD，但門診曾診斷 PAOD → ECA = Y，rationale 要寫「門診 2026/02/14 詹世鴻 Diagnosis: PAOD」。
 
 Skip rationale only for objective demographic fields (age, female, weight_kg, height_cm, cr_mg_dl, egfr) and operation defaults (urgency, weight_of_procedure, thoracic_aorta).
 

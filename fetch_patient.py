@@ -1,9 +1,14 @@
 """Fetch a patient's EMR docs via Python requests using EMR session URL.
 
-Usage: python fetch_patient.py <SESSION_ID> <chart> [<sn>]
+Usage:
+    python fetch_patient.py <SESSION_ID> <chart> [<sn1> <sn2> ...]
 
-If sn omitted, fetches owhbchemo only (chart-wide doc).
-Saves to _emr_raw/<chart>_raw.txt with sections separated by ===.
+  sns can be inpatient (I20...) or outpatient (O20...).
+  - I-prefix → fetch DC, AD, PL, diagnosis, order
+  - O-prefix → fetch diagnosis, soap, order (門診紀錄)
+  Always fetches owhbchemo (chart-wide).
+
+For ECA/CPD/IDDM 等容易漏的診斷，建議帶上住院前後 ±3 個月的 OPD sns 一起掃。
 """
 import sys, io, argparse, requests
 from pathlib import Path
@@ -52,24 +57,31 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("session", help="EMR session ID (the part inside (S(...)))")
     ap.add_argument("chart")
-    ap.add_argument("sn", nargs="?", default=None)
+    ap.add_argument("sns", nargs="*", default=[],
+                    help="One or more medical sns. I-prefix=inpatient, O-prefix=outpatient.")
     args = ap.parse_args()
 
     base = f"http://hisweb.hosp.ncku/Emrquery/(S({args.session}))/tree/"
     out_dir = Path(__file__).parent / "_emr_raw"
     out_dir.mkdir(exist_ok=True)
 
+    INPATIENT_DOCS = [("DC", "viewer_v2"), ("AD", "viewer_v2"),
+                       ("PL", "viewer_v2"), ("diagnosis", "viewer"),
+                       ("order", "viewer")]
+    OUTPATIENT_DOCS = [("diagnosis", "viewer"), ("soap", "viewer"),
+                        ("order", "viewer")]
+
     sections = []
-    if args.sn:
-        for kind, viewer in [("DC", "viewer_v2"), ("AD", "viewer_v2"),
-                              ("PL", "viewer_v2"), ("diagnosis", "viewer"),
-                              ("order", "viewer")]:
+    for sn in args.sns:
+        docs = INPATIENT_DOCS if sn.upper().startswith("I") else OUTPATIENT_DOCS
+        label = "住院" if sn.upper().startswith("I") else "門診"
+        for kind, viewer in docs:
             try:
-                txt = fetch(base, kind, args.chart, args.sn, viewer)
-                sections.append(f"=== {kind} (sn={args.sn}) ===\n{txt}")
-                print(f"  fetched {kind}: {len(txt)} chars")
+                txt = fetch(base, kind, args.chart, sn, viewer)
+                sections.append(f"=== [{label}] {kind} (sn={sn}) ===\n{txt}")
+                print(f"  fetched [{label}] {kind} ({sn}): {len(txt)} chars")
             except Exception as e:
-                print(f"  ERROR {kind}: {e}")
+                print(f"  ERROR {kind} ({sn}): {e}")
 
     # owhbchemo (chart-wide, no sn)
     try:
