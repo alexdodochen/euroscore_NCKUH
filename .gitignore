@@ -1,0 +1,23 @@
+# Patient data — NEVER commit
+*.xlsx
+*.xls
+~$*
+_emr_raw/*
+!_emr_raw/gemini_prompt.md
+HANDOFF.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
