@@ -53,23 +53,27 @@ pip install -r requirements.txt
 對每位病人：
 
 1. **Browser 切換 chart**（Chrome / 任何能登 EMR 的瀏覽器）
-2. **找 medicalsn**：leftFrame `Discharge Note(*)` anchor 中的 `medicalsn=I...`
-3. **Python 抓 docs**：
+2. **找 medicalsn**：leftFrame
+   - 住院 sn (I-prefix)：對應 admission date 那筆 `Discharge Note(*)` anchor
+   - 門診 sns (O-prefix)：抓住院前後 ±3 個月的 OPD `Diagnosis` 連結（為了找 PAOD/COPD/IDDM 等漏診）
+3. **Python 抓 docs**（同時抓住院 + 門診）：
    ```bash
-   python fetch_patient.py <SESSION_ID> <CHART_NO> <SN>
+   python fetch_patient.py <SESSION_ID> <CHART_NO> <I_SN> <O_SN_1> <O_SN_2> ...
+   # I-prefix → 抓 DC/AD/PL/diagnosis/order
+   # O-prefix → 抓 diagnosis/soap/order
    ```
-4. **gemini 解析**：
+4. **gemini 解析**（含掃 OPD 找漏診 + 強制 rationale dict）：
    ```bash
    cat _emr_raw/gemini_prompt.md _emr_raw/<CHART>_raw.txt > _emr_raw/_gemini_input.txt
    gemini -p "Extract YAML per schema. Use age = 入院年度 - 出生年度." < _emr_raw/_gemini_input.txt
    ```
-5. **人工讀 AD/DC** 判讀共病（critical preop / ECA / previous cardiac surgery / recent MI）
-6. **寫 YAML** 到 `_emr_raw/<CHART>.yaml`
+5. **人工讀 AD/DC** 驗證共病（critical preop / ECA / previous cardiac surgery / recent MI）
+6. **寫 YAML** 到 `_emr_raw/<CHART>.yaml`，含 `rationale:` dict（13 個臨床欄位無論 Y/N 都要寫出處）
 7. **算分**：
    ```bash
    python cheatsheet.py _emr_raw/<CHART>.yaml
    ```
-8. **批次寫回 Excel**：
+8. **批次寫回 Excel**（D 欄會自動填判讀依據）：
    ```bash
    python write_to_excel.py
    ```
