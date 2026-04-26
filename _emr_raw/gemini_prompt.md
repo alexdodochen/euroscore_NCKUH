@@ -32,14 +32,31 @@ thoracic_aorta: false
 manual_score: <unchanged from template>
 ```
 
-In addition to the YAML above, output a `rationale:` dict at the END of the YAML, with one entry per non-default field. Format:
+In addition to the YAML above, output a `rationale:` dict at the END of the YAML, with **one entry per clinically-judged field — INCLUDING fields where the answer is N or default**. Format:
 
 ```yaml
 rationale:
-  field_key: "短句說明依據（例：AD: 'lives at home with independent daily activity' / DC hospital course / Order list / Echo 2026-02-11 LVEF 53%）"
+  field_key: "短句說明依據（例：AD: 'lives at home with independent daily activity' → N / DC: discharged stable, no IABP/ECMO → N / Order list: Toujeo glargine → Y / Echo 2026-02-11 LVEF 53% → good）"
 ```
 
-Only include rationale for fields that are non-default (e.g. iddm: true, previous_cardiac_surgery: true, recent_mi: true, ECA: true, critical_preop: true, NYHA != I, ccs4: true, renal != normal, lv_function != good, pa_systolic != none). Skip default-value fields.
+**MUST include rationale for these fields (regardless of Y or N):**
+- nyha
+- ccs4
+- iddm
+- extracardiac_arteriopathy
+- chronic_pulmonary_disease
+- poor_mobility
+- previous_cardiac_surgery
+- active_endocarditis
+- critical_preop
+- lv_function
+- recent_mi
+- pa_systolic
+- renal
+
+For each, cite WHERE in the EMR you found evidence (AD past hx / DC hospital course / Order list / Echo report / problem list / specific quote). For N values, briefly note what was checked and not found.
+
+Skip rationale only for objective demographic fields (age, female, weight_kg, height_cm, cr_mg_dl, egfr) and operation defaults (urgency, weight_of_procedure, thoracic_aorta).
 
 EMR text follows after this line:
 ---
