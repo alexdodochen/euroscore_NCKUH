@@ -4,7 +4,6 @@
 ~$*
 _emr_raw/*
 !_emr_raw/gemini_prompt.md
-HANDOFF.md
 
 # Python
 __pycache__/
@@ -22,5 +21,6 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Claude Code internal
-.claude/
+# Claude Code internal — keep skills tracked, ignore everything else
+.claude/*
+!.claude/skills/
