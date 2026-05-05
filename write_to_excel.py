@@ -73,10 +73,11 @@ def display(p):
 
 
 def update_main(ws, chart, score):
-    """Update column J of the row matching chart number in column D."""
+    """Update column J of the row matching chart number in column D.
+    Writes as percentage string (e.g. '5.57%') for direct readability."""
     for r in range(2, ws.max_row + 1):
         if str(ws.cell(row=r, column=COL_CHART).value or "").strip() == chart:
-            ws.cell(row=r, column=COL_EURO, value=round(score, 4))
+            ws.cell(row=r, column=COL_EURO, value=f"{score * 100:.2f}%")
             return r
     return None
 
