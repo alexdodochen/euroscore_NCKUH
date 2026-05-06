@@ -34,30 +34,38 @@ COL_CR = 8
 COL_EURO = 10
 
 # (label, key, type, options/help)
+# Order grouped per user spec, 4 sections separated by colored divider rows.
 ITEMS = [
+    # ── Section 1: demographic + renal ──
     ("年齡 (歲)", "age", "number", "整數，>=18"),
     ("性別", "female", "choice", "男 / 女"),
     ("體重 (kg)", "weight_kg", "number", "用於計算 CC"),
     ("血清 Cr (mg/dL)", "cr_mg_dl", "number", "用於計算 CC"),
     ("Creatinine clearance (ml/min)", "cc", "auto", "Cockcroft-Gault 自動算"),
     ("腎功能分級", "renal", "choice", "正常(>85) / cc_50_85 / cc_le_50 / 透析"),
-    ("NYHA class", "nyha", "choice", "I / II / III / IV"),
-    ("CCS angina class 4", "ccs4", "yn", "是 / 否 (CCS4 才算)"),
-    ("胰島素糖尿病 IDDM", "iddm", "yn", "是 / 否"),
+    ("──── 共病風險因子 ────", None, "section", ""),
+    # ── Section 2: comorbidity Y/N ──
     ("心外動脈病變 ECA", "extracardiac_arteriopathy", "yn",
      "claudication / 頸動脈>50% / 截肢 / 主動脈或周邊動脈介入"),
-    ("慢性肺病 CPD", "chronic_pulmonary_disease", "yn", "長期使用支氣管擴張劑或類固醇"),
     ("行動不便", "poor_mobility", "yn", "嚴重神經/骨骼疾病影響行動"),
     ("曾接受心臟手術 Redo", "previous_cardiac_surgery", "yn",
      "之前曾打開心包進行心臟手術"),
+    ("慢性肺病 CPD", "chronic_pulmonary_disease", "yn", "長期使用支氣管擴張劑或類固醇"),
     ("Active endocarditis", "active_endocarditis", "yn", "手術時仍在使用抗生素治療 IE"),
     ("Critical preop state", "critical_preop", "yn",
      "VT/VF/SCD、CPR、術前插管、inotrope、IABP/VAD、急性腎衰其中之一"),
+    ("胰島素糖尿病 IDDM", "iddm", "yn", "住院 order 有 insulin → Y"),
+    ("──── 心臟相關 ────", None, "section", ""),
+    # ── Section 3: cardiac ──
+    ("NYHA class", "nyha", "choice", "I / II / III / IV"),
+    ("CCS angina class 4", "ccs4", "yn", "是 / 否 (CCS4 才算)"),
     ("LV function", "lv_function", "choice",
      "good(≥51%) / moderate(31-50%) / poor(21-30%) / very_poor(≤20%)"),
     ("Recent MI (90 天內)", "recent_mi", "yn", "是 / 否"),
     ("PA systolic 肺動脈收縮壓", "pa_systolic", "choice",
      "none(<31) / 31_55 / ge_55"),
+    ("──── 手術相關 ────", None, "section", ""),
+    # ── Section 4: operation ──
     ("Urgency", "urgency", "choice", "elective / urgent / emergency / salvage"),
     ("Weight of procedure", "weight_of_procedure", "choice",
      "isolated_cabg / single_non_cabg / two / three_plus"),
@@ -69,8 +77,11 @@ ITEMS = [
 HEADER_FILL = PatternFill("solid", fgColor="DCE6F1")
 PATIENT_FILL = PatternFill("solid", fgColor="FCE4D6")
 SCORE_FILL = PatternFill("solid", fgColor="FFF2CC")
+SECTION_FILL = PatternFill("solid", fgColor="C6EFCE")
 THIN = Side(style="thin", color="999999")
+THICK = Side(style="medium", color="555555")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+SECTION_BORDER = Border(left=THIN, right=THIN, top=THICK, bottom=THICK)
 
 
 def fmt_date(v):
@@ -148,6 +159,18 @@ def write_patient_block(ws, patient, start_row):
     r += 1
 
     for label, key, kind, helptxt in ITEMS:
+        if kind == "section":
+            cell = ws.cell(row=r, column=1, value=label)
+            cell.font = Font(bold=True, italic=True, color="375623", size=10)
+            cell.fill = SECTION_FILL
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = SECTION_BORDER
+            for c in (2, 3):
+                ws.cell(row=r, column=c).fill = SECTION_FILL
+                ws.cell(row=r, column=c).border = SECTION_BORDER
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+            r += 1
+            continue
         ws.cell(row=r, column=1, value=label)
         if kind == "auto":
             cc_cell = ws.cell(row=r, column=2)

@@ -1,82 +1,92 @@
 ============================================
-  HANDOFF — Last Updated: 2026-04-26 09:00
+  HANDOFF — Last Updated: 2026-05-06
 ============================================
 
 [What this session did]
-  1. Computed EuroSCORE II for the first batch of 5 cath patients.
-  2. Wrote scores back to the master sheet `2026 (資訊室CAD-3.2)` column J + 5 evaluation blocks in the per-attending sheet.
-  3. Diff-checked auto vs manual scoring; aligned 2 cases where manual had data-entry errors.
+  1. Computed EuroSCORE II for 6 cardiac admission patients (1 elective post-cath, 5 acute ICU presentations including ESRD/IABP/intubated cases).
+  2. Reorganized the per-attending evaluation sheet block into 4 visually grouped sections with green-band dividers (demographic+renal / comorbidity Y/N / cardiac / operation).
+  3. Distilled 3 generalizable scoring rules from this batch into PHI-safe `memory/rule_*.md` files.
 
 [Current state]
-  - Branch: main, clean before this handoff edit
-  - Latest commit: a7de119 — Playwright fallback for SN discovery + active-admission iviewer support
-  - Deploy state: N/A (this is a local computation tool, no deployment)
+  - Branch: main, has staged + committed changes from this session
+  - Latest commit will include: per-attending sheet ITEMS reorder + 3 memory rule files + HANDOFF refresh
+  - Deploy state: N/A (local computation tool, no deployment)
 
 [Next steps]
-  - Fetch next batch of 5 cath patients per the workflow below
-  - Optionally test the new Playwright fallback path (`discover_sns_pw.py`, `fetch_via_pw.py`) when the requests-based fetcher fails
+  - On the next batch, drive `discover_sns_pw.py` -> `fetch_via_pw.py` -> per-patient YAML -> `cheatsheet.py` -> `bootstrap_workbook.py` -> `generate_euroscore_sheet.py` -> `write_to_excel.py` -> `mdcalc_sheet.py`
+  - Apply the three new rules from the start: order-based IDDM, calendar-year age, NYHA evaluated from EMR (never default I)
+  - For active inpatient admissions, `fetch_via_pw.py` auto-detects iviewer.aspx vs viewer/viewer_v2.aspx; raw `requests` against viewer.aspx for active admissions returns IndexOutOfRangeException
 
 [Known issues / blockers]
   - None
 
 [Don't repeat these mistakes]
-  - Manual scoring sometimes misses prior cardiac surgery — any pericardium-opening procedure counts (e.g. ascending aorta + hemiarch replacement is previous cardiac surgery)
-  - Manual scoring sometimes misclassifies renal severity — use Cockcroft-Gault, not eGFR, for grading; HD/ESRD/dialysis terms always map to "dialysis"
+  - Do NOT default NYHA to I — read AD Present Illness / ROS and assign clinically (rule_nyha_from_emr.md)
+  - Do NOT use the EMR AD-displayed age — use calendar-year subtraction (rule_age_calendar_year.md)
+  - Do NOT apply the strict "preop chronic insulin" interpretation for IDDM — any in-hospital insulin order is Y (rule_iddm_in_hospital_insulin.md)
+  - Do NOT delegate EMR raw text to gemini — main agent must read it directly (CLAUDE.md global PHI policy)
+  - Excel master col J should hold the percentage string ("X.XX%"), not decimal 0.0X
+  - Output blocks (per-attending sheet AND chat tables) follow the user's section grouping, separated by colored divider rows
 
 [Relevant files]
-  - euroscore_ii.py — Nashef 2012 Table 6 coefficients + CG calc + renal_category
-  - cheatsheet.py — YAML → MDCalc-style stratified cheatsheet + diff vs manual
-  - fetch_patient.py — direct EMR doc fetch via Python requests (no browser, saves tokens)
-  - generate_euroscore_sheet.py — builds the Excel evaluation sheet (21 inputs + auto-calc columns)
-  - write_to_excel.py — writes YAML-derived score back to master sheet column J + per-block
+  - euroscore_ii.py — Nashef 2012 Table 6 coefficients + Cockcroft-Gault + renal_category
+  - cheatsheet.py — YAML -> MDCalc-style stratified cheatsheet + diff vs manual
+  - fetch_patient.py — direct EMR doc fetch via Python requests (discharged admissions, viewer/viewer_v2)
+  - fetch_via_pw.py — Playwright fetcher with active-vs-discharged detection (active admissions need iviewer.aspx)
+  - discover_sns_pw.py — Playwright chart-switch + leftFrame medicalsn enumeration
+  - bootstrap_workbook.py — build EURO-CR.xlsx master sheet from existing per-patient YAMLs (fresh-clone setup)
+  - generate_euroscore_sheet.py — builds the per-attending evaluation sheet, ITEMS now grouped into 4 sections with green divider bands
+  - write_to_excel.py — writes score back to master col J as "X.XX%" string + per-block detailed cells
+  - mdcalc_sheet.py — adds a sheet whose row order matches the hospital MDCalc form UI
+  - keyin_sheet.py — console output of the same MDCalc-order layout for copy-paste verification
   - _emr_raw/<chart>.yaml — per-patient input (gitignored, contains PHI)
-  - _emr_raw/gemini_prompt.md — schema given to gemini for raw-text parsing
-  - discover_sns_pw.py / fetch_via_pw.py / bootstrap_workbook.py / keyin_sheet.py / mdcalc_sheet.py — added 2026-05-05, Playwright fallback path
+  - _emr_raw/gemini_prompt.md — schema for the YAML extraction (used as reference; main agent does the extraction itself, not gemini)
 
 [Important memory files]
   - MEMORY.md (index)
+  - rule_iddm_in_hospital_insulin.md
+  - rule_age_calendar_year.md
+  - rule_nyha_from_emr.md
 
 ============================================
-  Workflow (per patient, 9 steps)
+  Workflow (per patient, fresh-clone path)
 ============================================
 
-1. Browser switch chart (Chrome MCP): set `txtChartNo`, click `BTQuery`, wait for leftFrame body to contain new chart string.
-2. Find sn: in leftFrame, locate `Discharge Note(*)` anchor with `medicalsn=I...`. May have multiple — verify in next step.
-3. Python fetch (token-efficient):
-     `python fetch_patient.py <SESSION_ID> <chart> <sn>`
-   Then check first line of `_emr_raw/<chart>_raw.txt` for admission date to confirm correct sn.
-4. Gemini parse (delegated grunt work):
-     `cat _emr_raw/gemini_prompt.md _emr_raw/<chart>_raw.txt > _emr_raw/_gemini_input.txt`
-     `gemini -p "Extract YAML per schema. Use age = admission_year - birth_year." < _emr_raw/_gemini_input.txt`
-5. Read AD/DC manually (clinical comorbidity judgment — Claude's job, not gemini's):
-   - critical_preop: IABP / ECMO / shock / decomp HF / acute resp failure / inotropes / VT-VF
-   - ECA: claudication / carotid >50% stenosis / amputation / prior or planned aortic-limb-carotid intervention (absent pulse alone does NOT count)
-   - previous_cardiac_surgery: any pericardium-opening procedure, including ascending aorta + hemiarch replacement
-   - recent_mi: acute MI within 90d (unstable angina != MI)
-   - poor_mobility: AD describes daily activity; independent -> N
-6. Write YAML to `_emr_raw/<chart>.yaml`, including manual_score and rationale per field.
-7. Score it: `python cheatsheet.py _emr_raw/<chart>.yaml`
-8. Batch write back to Excel at the end: `python write_to_excel.py`
-9. Report using the standard summary table format (chart / name / predicted / manual / diff / alignment status + reason). Keep this report in chat only — never commit it to the public repo.
+1. Discover medicalsns: `python discover_sns_pw.py <SESSION_ID> <chart1> [<chart2> ...] --start 2026-01-01 --stop 2026-08-01`
+2. Identify the correct admission I-sn by matching admission date in `_emr_raw/<chart>_left.html`
+3. Fetch EMR docs: `python fetch_via_pw.py <SESSION_ID> <chart>:<I_SN>,<O_SN_1>,<O_SN_2> ...` — auto-detects active (iviewer) vs discharged (viewer/viewer_v2)
+4. Split sections: `python _emr_raw/split_sections.py` to inspect AD/DC/PL/diagnosis/order independently
+5. Read AD/DC for clinical comorbidity judgment (do NOT delegate to gemini):
+   - critical_preop: IABP / ECMO / shock / decomp HF / acute resp failure / inotropes / VT-VF / preop ventilation / acute renal failure
+   - ECA: claudication / carotid >50% / amputation / prior or planned aortic-limb-carotid intervention (absent pulse alone does NOT count)
+   - previous_cardiac_surgery: any pericardium-opening procedure (PCI / cath / PTA do NOT count; ORIF does NOT count)
+   - recent_mi: acute MI within 90 days (unstable angina != MI; chronic CKD-related stable troponin elevation != acute MI)
+   - poor_mobility: AD describes daily activity; "independent" -> N, "partially dependent / nearly bedridden" -> Y
+   - NYHA: read PI/ROS for effort tolerance, never default to I (see rule_nyha_from_emr.md)
+6. Grep order list for insulin keywords (any hit -> iddm Y; see rule_iddm_in_hospital_insulin.md)
+7. Write `_emr_raw/<chart>.yaml` with all 21 fields + rationale dict for the 13 clinical fields. Use calendar-year age (see rule_age_calendar_year.md).
+8. Score it: `python cheatsheet.py _emr_raw/<chart>.yaml`
+9. Bootstrap workbook (if EURO-CR.xlsx doesn't exist yet): `python bootstrap_workbook.py`
+10. Generate per-attending sheet: `python generate_euroscore_sheet.py <attending-name>`
+11. Write back: `python write_to_excel.py`
+12. Add MDCalc-order sheet: `python mdcalc_sheet.py`
+13. Report results in chat using the standard summary table format. Report stays in chat only — never commit patient identifiers to this public repo.
 
 ============================================
-  Scoring rules
+  Per-attending sheet block layout (after 2026-05-06 redesign)
 ============================================
 
-1. Age = admission_year - birth_year (calendar-year subtraction, matches MDCalc)
-2. NYHA: default I (beta=0)
-3. Poor mobility: default N. AD "independent" -> N; "partially dependent" etc. -> Y
-4. CCS class 4: default N. Only Y if PI explicitly states "unable to perform any activity"
-5. Renal — HD/ESRD/dialysis terms -> dialysis; else Cockcroft-Gault:
-     CC > 85 -> normal
-     CC 50-85 -> moderate
-     CC <= 50 -> severe
-   eGFR is reference only, not used for grading
-6. No echo: LV=good, PHT=none
-7. Operation defaults (cath patients): urgency=elective, weight=isolated_cabg, thoracic_aorta=N
-8. Critical preop: read AD+DC carefully, don't keyword-match. Y if IABP / ECMO / shock / acute resp failure / decomp HF / preop inotropes / VT-VF / preop ventilation / acute renal failure
-9. ECA: strict definition — absent pulse or bruit alone does not qualify
-10. Previous cardiac surgery: any pericardium-opening surgery counts (including aortic root / arch replacement)
+Each patient block in `<attending> Euroscore評估表` is grouped into 4 sections with green divider bands:
+
+  Section 1 (demographic + renal): age / gender / weight / Cr / CC / renal grade
+  ── divider ──
+  Section 2 (comorbidity Y/N): ECA / poor mobility / previous cardiac surgery (Redo) / chronic lung disease / active endocarditis / critical preop / IDDM
+  ── divider ──
+  Section 3 (cardiac): NYHA / CCS class 4 / LV function / recent MI (90d) / PA systolic
+  ── divider ──
+  Section 4 (operation): urgency / weight of procedure / thoracic aorta surgery
+  ── final ──
+  EuroSCORE II predicted mortality (highlighted yellow)
 
 ============================================
   EMR session
@@ -84,8 +94,9 @@
 
 - URL pattern: `http://hisweb.hosp.ncku/Emrquery/(S(SESSION_ID))/tree/frame.aspx`
 - Session ID expires within hours — request a fresh one from user when needed
-- Python `requests` works directly with the session URL (no cookies needed)
-- Lab reports (Cr/echo) require opening EMROutcome.aspx tab; TreeView loads dynamically
+- Cookieless ASP.NET session bound to URL; any process using the same URL shares state
+- `list.aspx` (the leftFrame tree) is JS-driven; raw `requests` cannot enumerate medicalsns. Use Playwright (`discover_sns_pw.py`).
+- Active inpatient admissions use `iviewer.aspx` for AD/PL/diagnosis/order/consult; raw `viewer.aspx` returns `IndexOutOfRangeException` for these. Discharged admissions use `viewer.aspx` and `viewer_v2.aspx`. `fetch_via_pw.py` auto-detects which.
 
 ============================================
   PHI policy reminder
@@ -97,5 +108,4 @@ This repo is PUBLIC. Never write to memory/, HANDOFF.md, or any tracked file:
   - Specific lab values tied to identifiers
   - Raw EMR text or screenshots
 
-Patient-specific working data lives only in `_emr_raw/` (gitignored) and chat. Per-batch
-result tables (chart / name / score) are reported in chat only — never committed.
+Patient-specific working data lives only in `_emr_raw/` (gitignored) and chat. Per-batch result tables (chart / name / score) are reported in chat only — never committed.
